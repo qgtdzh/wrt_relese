@@ -11,6 +11,7 @@ on:
         default: jdcloud_ipq60xx_libwrt
         options:
           - jdcloud_ipq60xx_libwrt
+          - jdcloud_ipq60xx_k612
           - jdcloud_ipq60xx_immwrt
           - jdcloud_ipq60xx_lede
           - cmcc_rax3000m_immwrt21
