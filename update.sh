@@ -291,6 +291,7 @@ add_ax6600_led() {
     local target_dir="$BUILD_DIR/target/linux/qualcommax/ipq60xx/base-files"
     local initd_dir="$target_dir/etc/init.d"
     local sbin_dir="$target_dir/sbin"
+    local athena_led_dir="$BUILD_DIR/package/emortal/luci-app-athena-led"
 
     if [ -d "$(dirname "$target_dir")" ] && [ -d "$initd_dir" ]; then
         cat <<'EOF' >"$initd_dir/start_screen"
@@ -314,6 +315,8 @@ EOF
         # 临时加一下
         install -m 755 -D "$BASE_PATH/patches/cpuusage" "$sbin_dir/cpuusage"
     fi
+
+    \rm -rf $athena_led_dir 2>/dev/null
 }
 
 chanage_cpuusage() {
@@ -403,6 +406,35 @@ update_pw_ha_chk() {
     fi
 }
 
+install_opkg_distfeeds() {
+    # 只处理aarch64
+    if ! grep -q "nss-packages" "$BUILD_DIR/feeds.conf.default"; then
+        return
+    fi
+    local emortal_def_dir="$BUILD_DIR/package/emortal/default-settings"
+    local distfeeds_conf="$emortal_def_dir/files/99-distfeeds.conf"
+
+    if [ -d "$emortal_def_dir" ] && [ ! -f "$distfeeds_conf" ]; then
+        install -m 755 -D "$BASE_PATH/patches/99-distfeeds.conf" "$distfeeds_conf"
+
+        sed -i "/define Package\/default-settings\/install/a\\
+\\t\$(INSTALL_DIR) \$(1)/etc\\n\
+\t\$(INSTALL_DATA) ./files/99-distfeeds.conf \$(1)/etc/99-distfeeds.conf\n" $emortal_def_dir/Makefile
+
+        sed -i "/exit 0/i\\
+[ -f \'/etc/99-distfeeds.conf\' ] && mv \'/etc/99-distfeeds.conf\' \'/etc/opkg/distfeeds.conf\'\n\
+sed -ri \'/check_signature/s@^[^#]@#&@\' /etc/opkg.conf\n" $emortal_def_dir/files/99-default-settings
+    fi
+}
+
+update_nss_pbuf_performance() {
+    local pbuf_path="$BUILD_DIR/package/kernel/mac80211/files/pbuf.uci"
+    if [ -d "$(dirname "$pbuf_path")" ] && [ -f $pbuf_path ]; then
+        sed -i "s/auto_scale '1'/auto_scale 'off'/g" $pbuf_path
+        sed -i "s/scaling_governor 'schedutil'/scaling_governor 'performance'/g" $pbuf_path
+    fi
+}
+
 main() {
     clone_repo
     clean_up
@@ -428,6 +460,8 @@ main() {
     add_ax6600_led
     set_custom_task
     update_pw_ha_chk
+    install_opkg_distfeeds
+    update_nss_pbuf_performance
     install_feeds
 }
 
