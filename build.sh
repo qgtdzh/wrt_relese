@@ -35,6 +35,23 @@ COMMIT_HASH=${COMMIT_HASH:-none}
 
 $BASE_PATH/update.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
 
+# Handle build cache
+if [[ -d "$BASE_PATH/build_cache" ]]; then
+    # 检查目录是否为空
+    if [ -n "$(ls -A "$BASE_PATH/build_cache")" ]; then
+        if [ -d "$BASE_PATH/build_cache/staging_dir" ]; then
+            mkdir -p "$BASE_PATH/$BUILD_DIR/staging_dir/"
+            rsync -a --delete "$BASE_PATH/build_cache/staging_dir/" "$BASE_PATH/$BUILD_DIR/staging_dir/"
+        fi
+        if [ -d "$BASE_PATH/build_cache/build_dir" ]; then
+            mkdir -p "$BASE_PATH/$BUILD_DIR/build_dir/"
+            rsync -a --delete "$BASE_PATH/build_cache/build_dir/" "$BASE_PATH/$BUILD_DIR/build_dir/"
+        fi
+        echo "user build caching"
+    fi
+    \rm -rf $BASE_PATH/build_cache/*
+fi
+
 \cp -f "$CONFIG_FILE" "$BASE_PATH/$BUILD_DIR/.config"
 
 cd "$BASE_PATH/$BUILD_DIR"
@@ -57,3 +74,21 @@ FIRMWARE_DIR="$BASE_PATH/firmware"
 mkdir -p "$FIRMWARE_DIR"
 find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
 \rm -f "$BASE_PATH/firmware/Packages.manifest" 2>/dev/null
+
+# Clean up build cache
+if [[ -d "$BASE_PATH/build_cache" ]]; then
+    echo "copy build cache"
+    make clean
+    # 清理dl节约空间
+    \rm -rf "$BASE_PATH/$BUILD_DIR/dl/"
+
+    # 备份build_dir
+    mkdir -p "$BASE_PATH/build_cache/build_dir"
+    rsync -a --delete "$BASE_PATH/$BUILD_DIR/build_dir/" "$BASE_PATH/build_cache/build_dir/"
+    \rm -rf $BASE_PATH/$BUILD_DIR/build_dir/*
+
+    # staging_dir
+    mkdir -p "$BASE_PATH/build_cache/staging_dir"
+    rsync -a --delete "$BASE_PATH/$BUILD_DIR/staging_dir/" "$BASE_PATH/build_cache/staging_dir/"
+    \rm -rf $BASE_PATH/$BUILD_DIR/staging_dir/*
+fi
